@@ -2,9 +2,19 @@ from flask import Flask, render_template, request,url_for, session, redirect
 import psycopg2
 from analyze_news import Analyze_news
 from authlib.integrations.flask_client import OAuth
+nltk.download('all')
 
 # Connect to PostgreSQL database (replace with your credentials)
-conn = psycopg2.connect(dbname="assignmentpy", user="postgres", password="123456789", host="localhost", port="5432")
+db_config = {
+    'dbname': 'assignmentpy',
+    'user': 'assignmentpy_user',
+    'password': '6C1fFcmhXh1Woespyo9B4I3q63ATzvWN',
+    'host': 'dpg-cnmmsgen7f5s73d7qngg-a ',
+    'port': '5432'
+}
+
+
+conn = psycopg2.connect(**db_config)
 cur = conn.cursor()
 
 app = Flask(__name__)
@@ -81,6 +91,22 @@ def submit_url():
         analysis_result = Analyze_news(url)
 
         if analysis_result:
+
+                # Connect to the database
+            conn = psycopg2.connect(**db_config)
+            cur = conn.cursor()
+        
+            # Create a table if it doesn't exist
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS analysis(
+                    url_given VARCHAR(1000),
+                    cleaned_text TEXT,
+                    number_of_sentences INTEGER,
+                    number_of_words INTEGER,
+                    number_of_pos_tags INTEGER,
+                    sentiment_analysis TEXT
+                )
+            """)
             # Store data in database
             cur.execute("INSERT INTO analysis (url_given, cleaned_text, number_of_sentences, number_of_words, number_of_pos_tags,sentiment_analysis) VALUES (%s, %s, %s, %s, %s, %s)",
                         (analysis_result['url'], analysis_result['text'], analysis_result['num_sentences'], analysis_result['num_words'], analysis_result['pos_tags'], analysis_result['sentiment_labels'] ))
@@ -102,7 +128,9 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-
+        conn = psycopg2.connect(**db_config)
+        cur = conn.cursor()
+        
         cur.execute("SELECT * FROM users WHERE username = %s AND password = %s", (username, password))
         user = cur.fetchone()
 
@@ -115,6 +143,8 @@ def login():
 def fetch_analysis_data():
     """Fetches data from the "analysis" table and returns a list of dictionaries."""
     try:
+        conn = psycopg2.connect(**db_config)
+        cur = conn.cursor()
         cur.execute("SELECT * FROM analysis")
         rows = cur.fetchall()
         analysis_data = []
